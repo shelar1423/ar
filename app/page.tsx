@@ -508,14 +508,15 @@ export default function Page() {
                 <button className="dpad-btn left" aria-label="Turn left" {...dirHold('left')}>
                   <ArrowLeft size={22} />
                 </button>
-                <div
-                  className="dpad-hub"
+                <button
+                  type="button"
+                  className="dpad-hub pad-center-btn"
                   onPointerDown={onHorn}
-                  title="Horn"
-                  aria-label="Horn"
+                  title="Zepto Turbo Horn"
+                  aria-label="Zepto Horn"
                 >
-                  <Volume2 size={16} />
-                </div>
+                  z
+                </button>
                 <button className="dpad-btn right" aria-label="Turn right" {...dirHold('right')}>
                   <ArrowRight size={22} />
                 </button>

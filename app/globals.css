@@ -80,17 +80,27 @@
   grid-column:2;
   grid-row:2;
   border-radius:50%;
-  background:rgba(255,255,255,.18);
+  background:#ffffffea;
+  backdrop-filter:blur(8px);
   display:grid;
   place-items:center;
-  color:#ff2a7c;
+  color:#f32978;
+  font-family:Arial,Helvetica,sans-serif;
+  font-weight:900;
+  font-size:26px;
+  line-height:1;
   cursor:pointer;
-  border:1px solid rgba(255,255,255,.2);
-  transition:all .12s;
+  border:1.5px solid rgba(243,41,120,.35);
+  box-shadow:0 3px 8px rgba(0,0,0,.15);
+  transition:all .12s ease;
+  user-select:none;
+  -webkit-user-select:none;
+  touch-action:none;
 }
 .dpad-hub:active{
-  background:#ff2a7c;
+  background:#f32978;
   color:white;
+  box-shadow:0 0 16px rgba(243,41,120,.8);
   transform:scale(.9);
 }
 
