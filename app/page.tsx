@@ -1,0 +1,32 @@
+'use client';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowUpRight, Box, Flag, RotateCcw, Zap, Scan, ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react';
+import type { Game, GameState } from '../lib/game';
+const initial: GameState = { ready:false, progress:0, mode:'garage', phase:'idle', speed:0, lap:1, time:60, coins:0, energy:100, message:'', ar:false, placed:false, supported:false };
+export default function Home(){
+ const host=useRef<HTMLDivElement>(null); const overlay=useRef<HTMLElement>(null); const game=useRef<Game|null>(null); const [s,setS]=useState(initial); const [error,setError]=useState('');
+ useEffect(()=>{let dead=false; import('../lib/game').then(({Game})=>{if(dead||!host.current||!overlay.current)return; try {game.current=new Game(host.current,overlay.current,setS);}catch{setError('3D could not start. Try Chrome or Safari with hardware acceleration enabled.');}}).catch(()=>setError('The game could not load. Refresh to try again.')); return()=>{dead=true;game.current?.dispose();};},[]);
+ const hold=(key:'gas'|'brake'|'boost')=>({onPointerDown:(e:React.PointerEvent<HTMLButtonElement>)=>{e.currentTarget.setPointerCapture(e.pointerId);game.current?.input(key,true)},onPointerUp:()=>game.current?.input(key,false),onPointerCancel:()=>game.current?.input(key,false),onLostPointerCapture:()=>game.current?.input(key,false)});
+ return <main ref={overlay} className={`experience ${s.mode==='race'?'racing':''} ${s.ar?'ar':''}`}>
+  <div ref={host} className="viewport" aria-label="Interactive 3D Ballistik car and racetrack"/>
+  <header className="topbar"><a className="wordmark" href="/">POCKET<span>TRACK</span><i>AR</i></a><span className="edition">DIE-CAST DREAMS. REAL-WORLD RACING.</span><button className="icon-button" title="Return to garage" aria-label="Return to garage" onClick={()=>game.current?.garage()}><Box size={20}/></button></header>
+  {s.mode==='garage'?<>
+   <section className="identity"><div className="eyebrow"><span/> IN YOUR GARAGE / 001</div><h1>BALLIS<span>TIK.</span></h1><p>Small car.<br/>Unreasonably big energy.</p><div className="model-label">HOT WHEELS · UNLEASHED 2</div></section>
+   <aside className="specs"><span className="eyebrow">BUILT TO GO ALL OUT</span><div><span>CLASS</span><strong>STREET BEAST</strong></div><div><span>CHALLENGE</span><strong>3 LAPS / 60 SEC</strong></div><div><span>YOUR MISSION</span><strong>BOOST. DODGE. COLLECT.</strong></div></aside>
+   <div className="orbit-hint"><RotateCcw size={15}/> Drag to explore · pinch to zoom</div>
+   <section className="launch-panel"><div><span className="eyebrow">THE FLOOR IS YOUR RACETRACK</span><h2>Take it for a spin.</h2></div><div className="launch-actions"><button className="secondary" disabled={!s.ready} onClick={()=>game.current?.enterAR()}><Scan size={19}/> Play in your space</button><button className="primary" disabled={!s.ready} onClick={()=>game.current?.start()}><Flag size={19}/> Race in 3D <ArrowUpRight size={21}/></button></div></section>
+   <footer><span>A fan-made racing playground</span><a href="https://sketchfab.com/3d-models/hot-wheels-unleashed-2-ballistik-3e2a310334d649ed8c89b9a60d356d12" target="_blank" rel="noreferrer">Model: Zorg_Sinister · CC BY 4.0 ↗</a></footer>
+  </>:<>
+   <section className="hud"><div><span>LAP</span><strong>{s.lap}<small>/3</small></strong></div><div className={s.time<10?'urgent':''}><span>TIME LEFT</span><strong>{s.time.toFixed(1)}<small>s</small></strong></div><div><span>COINS</span><strong>{s.coins.toString().padStart(2,'0')}</strong></div><button className="icon-button" aria-label={s.phase==='paused'?'Resume race':'Pause race'} onClick={()=>game.current?.pause()}>{s.phase==='paused'?<Play/>:<Pause/>}</button></section>
+   <div className="race-message" role="status">{s.message}</div>
+   {s.ar&&!s.placed?<div className="placement"><Scan size={36}/><h2>Find your starting line.</h2><p>Move your phone slowly over a well-lit floor or table. Tap Place when the orange ring appears.</p><button className="primary" onClick={()=>game.current?.place()}>Place racetrack</button><button className="secondary" onClick={()=>game.current?.garage()}>Back to garage</button></div>:<>
+   <div className="speed"><strong>{Math.round(s.speed*15)}</strong><span>KM/H</span></div>
+   <section className="controls"><div className="steering"><button aria-label="Steer left" onPointerDown={()=>game.current?.lane(-1)}><ChevronLeft size={32}/></button><button aria-label="Steer right" onPointerDown={()=>game.current?.lane(1)}><ChevronRight size={32}/></button></div><div className="pedals"><button className="brake" {...hold('brake')}>BRAKE</button><button className="boost" {...hold('boost')}><Zap size={21}/><span>BOOST</span><meter min="0" max="100" value={s.energy}/></button><button className="gas" {...hold('gas')}>HOLD<br/><strong>GO</strong></button></div></section>
+   <div className="keyboard-hint">↑ / W accelerate · ← → / A D steer · Space boost · ↓ brake · P pause</div>
+   </>}
+   {(s.phase==='won'||s.phase==='lost'||s.phase==='paused')&&<div className="scrim"><section className="result"><Flag size={32}/><div className="eyebrow">{s.phase==='paused'?'PIT STOP':s.phase==='won'?'CHECKERED FLAG':'ONE MORE RUN?'}</div><h2>{s.phase==='paused'?'Take a breather.':s.phase==='won'?'Small car. Big win.':'So close. Go again.'}</h2><p>{s.phase==='paused'?'Your clock is paused.':`${s.coins} coins collected · ${s.phase==='won'?`${(60-s.time).toFixed(1)} second finish`:`${s.lap-1} complete laps`}`}</p><button className="primary" onClick={()=>s.phase==='paused'?game.current?.pause():game.current?.start()}>{s.phase==='paused'?'Resume race':'Race again'} <ArrowUpRight size={20}/></button><button className="secondary" onClick={()=>game.current?.garage()}>Back to garage</button></section></div>}
+  </>}
+  {(!s.ready||error)&&<div className="loading"><div className="eyebrow">POCKET TRACK / GARAGE</div><h2>{error?'Couldn’t start the engine.':'Unboxing your Ballistik.'}</h2><p>{error||s.message||`${s.progress}% · Preparing the original 3D model`}</p>{error||s.phase==='error'?<button className="primary" onClick={()=>location.reload()}>Try again</button>:<div className="load-bar"><i style={{width:`${s.progress}%`}}/></div>}</div>}
+  {s.mode==='garage'&&s.ready&&s.message&&<div className="notice" role="status"><p>{s.message}</p><button aria-label="Dismiss message" onClick={()=>game.current?.dismiss()}><X size={18}/></button></div>}
+ </main>
+}

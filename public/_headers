@@ -1,0 +1,5 @@
+/*
+  Permissions-Policy: xr-spatial-tracking=(self), camera=(self)
+  X-Content-Type-Options: nosniff
+/models/*
+  Cache-Control: public, max-age=86400
