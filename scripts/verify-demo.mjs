@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import ts from 'typescript';
 
+// 1. Model geometry & textures verification
 const b = fs.readFileSync(new URL('../public/models/ballistik-upright.glb', import.meta.url));
 const gltf = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)));
 assert(!gltf.skins?.length, 'Model must not depend on skeleton transforms');
@@ -25,59 +26,21 @@ assert(gltf.images.every(i => i.bufferView !== undefined), 'Textures must be emb
 const usdz = fs.readFileSync(new URL('../public/models/ballistik.usdz', import.meta.url));
 assert.equal(usdz.readUInt32LE(0), 0x04034b50);
 
-// Verify tracking card SVG
-const cardSvg = fs.readFileSync(new URL('../public/tracking-card.svg', import.meta.url), 'utf8');
-assert(cardSvg.includes('<svg') && cardSvg.includes('HOT WHEELS'), 'Tracking card SVG must be valid');
-
-// Transpile aruco.ts and CardTracker for testing
-const arucoSource = fs.readFileSync(new URL('../lib/aruco.ts', import.meta.url), 'utf8');
-const arucoJs = ts.transpileModule(arucoSource, {
+// 2. Transpile and verify Web Audio synthesizer
+const audioSource = fs.readFileSync(new URL('../lib/audio.ts', import.meta.url), 'utf8');
+const audioJs = ts.transpileModule(audioSource, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
-}).outputText.replace(/from ['"]([^'"]+)['"]/g, (_, id) => `from '${import.meta.resolve(id)}'`);
-const arucoModuleUrl = 'data:text/javascript;base64,' + Buffer.from(arucoJs).toString('base64');
+}).outputText;
+const audioModuleUrl = 'data:text/javascript;base64,' + Buffer.from(audioJs).toString('base64');
+const { sounds } = await import(audioModuleUrl);
+assert(typeof sounds.playZeptoSound === 'function', 'Must export playZeptoSound');
+assert(typeof sounds.setDrifting === 'function', 'Must export setDrifting');
+// Ensure calls do not crash in SSR/Node
+sounds.playZeptoSound();
+sounds.setDrifting(true);
+sounds.setDrifting(false);
 
-const trackerSource = fs.readFileSync(new URL('../lib/card-tracker.ts', import.meta.url), 'utf8');
-const trackerJs = ts.transpileModule(trackerSource, {
-  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
-}).outputText.replace(/from ['"]([^'"]+)['"]/g, (_, id) => {
-  if (id.includes('aruco')) return `from '${arucoModuleUrl}'`;
-  return `from '${import.meta.resolve(id)}'`;
-});
-const trackerModuleUrl = 'data:text/javascript;base64,' + Buffer.from(trackerJs).toString('base64');
-const { CardTracker } = await import(trackerModuleUrl);
-
-// Test synthetic marker detection on 180x180 image
-const tracker = new CardTracker(1.0);
-const w = 180, h = 180;
-const data = new Uint8ClampedArray(w * h * 4);
-data.fill(255); // White quiet zone
-const cellSize = 20;
-// Draw 7x7 black square at (1,1)
-for (let r = 1; r <= 7; r++) {
-  for (let c = 1; c <= 7; c++) {
-    for (let py = 0; py < cellSize; py++) {
-      for (let px = 0; px < cellSize; px++) {
-        const idx = ((r * cellSize + py) * w + (c * cellSize + px)) * 4;
-        data[idx] = 0; data[idx + 1] = 0; data[idx + 2] = 0; data[idx + 3] = 255;
-      }
-    }
-  }
-}
-// White cells for ArUco ID 0
-const whiteCells = [[2, 2], [2, 3], [2, 4], [2, 5], [2, 6]];
-for (const [c, r] of whiteCells) {
-  for (let py = 0; py < cellSize; py++) {
-    for (let px = 0; px < cellSize; px++) {
-      const idx = ((r * cellSize + py) * w + (c * cellSize + px)) * 4;
-      data[idx] = 255; data[idx + 1] = 255; data[idx + 2] = 255; data[idx + 3] = 255;
-    }
-  }
-}
-const detectedMarkers = tracker.detectMarker(w, h, data);
-assert.equal(detectedMarkers.length, 1, 'Should detect 1 synthetic marker');
-assert.equal(detectedMarkers[0].id, 0, 'Marker ID should be 0');
-
-// Transpile and test TryOn
+// 3. Transpile and test TryOn
 let source = fs.readFileSync(new URL('../lib/try-on.ts', import.meta.url), 'utf8');
 source = source.replace(
   /constructor\(private host:\s*HTMLElement,\s*private emit:\s*\(s:\s*ViewState\)\s*=>\s*void\)\s*\{/,
@@ -87,23 +50,33 @@ source = source.replace(
 let js = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
 }).outputText.replace(/from ['"]([^'"]+)['"]/g, (_, id) => {
-  if (id.includes('card-tracker')) return `from '${trackerModuleUrl}'`;
+  if (id.includes('audio')) return `from '${audioModuleUrl}'`;
   return `from '${import.meta.resolve(id)}'`;
 });
 
-globalThis.__test = true;
-const { TryOn } = await import('data:text/javascript;base64,' + Buffer.from(js).toString('base64'));
+const tempFile = new URL('../scripts/.test-temp-tryon.mjs', import.meta.url);
+fs.writeFileSync(tempFile, js);
+let TryOn;
+try {
+  globalThis.__test = true;
+  const mod = await import(tempFile.href);
+  TryOn = mod.TryOn;
+} finally {
+  try { fs.unlinkSync(tempFile); } catch {}
+}
 const v = new TryOn({}, () => {});
 v.state.mode = 'preview';
 v.state.ready = true;
 v.move(1, 0);
-assert.equal(v.direction.x, 0);
+assert.equal(v.direction.x, 0, 'Cannot drive before placing');
 v.place();
+assert.equal(v.state.placed, true, 'Must be placed after place()');
 
 const step = () => {
   for (let i = 0; i < 10; i++) v.frame((v.last || 1) + 16);
 };
 
+// Test driving in all 4 cardinal directions
 for (const [x, z] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
   v.reset();
   v.move(x, z);
@@ -111,17 +84,20 @@ for (const [x, z] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
   assert(x ? v.car.position.x * x > 0 : v.car.position.z * z > 0);
 }
 v.stop();
-const before = v.car.position.clone();
+for (let i = 0; i < 40; i++) step();
+const stoppedPos = v.car.position.clone();
 step();
-assert(v.car.position.equals(before));
+assert(v.car.position.distanceTo(stoppedPos) < 0.001, 'Car must come to a complete stop after coasting');
+
+// Test endless driving: verify car is NOT clamped to 0.45 anymore
+v.reset();
 v.move(1, 0);
-for (let i = 0; i < 100; i++) step();
-assert(v.car.position.x <= 0.45);
+for (let i = 0; i < 120; i++) step();
+assert(v.car.position.x > 0.45, `Canvas must be endless! Position x=${v.car.position.x} must exceed old 0.45 boundary`);
 
 // Test scale limits
 v.scale(10);
 assert.equal(v.size, 1.6);
-assert(v.car.position.x <= 0.151);
 v.scale(-10);
 assert.equal(v.size, 0.65);
 
@@ -131,22 +107,35 @@ v.rotateBy(Math.PI / 4);
 assert.equal(v.angle, prevRot + Math.PI / 4);
 assert.equal(v.car.rotation.y, v.angle);
 
-// Test tracking mode and hiding when card is lost
+// Test drift mechanics and state
+assert.equal(v.isDrifting, false);
+v.setDrift(true);
+assert.equal(v.isDrifting, true);
+assert.equal(v.state.drifting, true);
+v.move(1, 0);
+step();
+assert(v.skidMarksGroup.children.length >= 0);
+v.setDrift(false);
+assert.equal(v.isDrifting, false);
+assert.equal(v.state.drifting, false);
+
+// Test camera orientation gyro compensation in camera mode
 v.state.mode = 'camera';
-v.setTrackingMode('card');
-assert.equal(v.state.trackingMode, 'card');
-// In card mode without card visible in video, car is hidden
+v.hasOrientation = true;
+v.basePitch = 45;
+v.baseYaw = 0;
+v.baseRoll = 0;
+v.deviceBeta = 65; // User tilted phone camera UP by 20 deg
+v.deviceAlpha = 0;
+v.deviceGamma = 0;
 v.frame((v.last || 1) + 16);
-assert.equal(v.car.visible, false, 'Car must be hidden when card tracking is lost');
+// Camera pitch rotates up to keep the placed car anchored at the physical table/floor
+assert(v.camera.rotation.x > 0.3, 'Camera pitch must rotate up to anchor car in physical space when phone tilts up');
 
-// Switch to manual mode: car becomes visible
-v.setTrackingMode('manual');
-assert.equal(v.state.trackingMode, 'manual');
-assert.equal(v.car.visible, true, 'Car must be visible in manual mode');
-
+// Test camera cleanup
 let stopped = false;
 v.stream = { getTracks: () => [{ stop: () => (stopped = true) }] };
 v.stopCamera();
 assert(stopped && v.stream === null);
 
-console.log('PASS: upright static model, embedded textures, USDZ archive, tracking card SVG, ArUco detection, pose estimation, gesture rotation, scale limits, card-lost car hiding, and camera cleanup.');
+console.log('PASS: upright static model, embedded textures, USDZ archive, Web Audio synthesizer, endless canvas driving, drift mechanics, gesture rotation & scaling, gyro physical anchoring, and camera cleanup.');

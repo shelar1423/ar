@@ -17,15 +17,15 @@ import {
   Clock,
   Check,
   ShieldCheck,
-  Printer,
-  Download,
-  FileText,
   Target,
   Sparkles,
+  Flame,
+  Volume2,
 } from 'lucide-react';
 import {Dialog, DialogContent, DialogTitle, DialogDescription} from '@/components/ui/dialog';
 import {Progress} from '@/components/ui/progress';
 import type {TryOn, ViewState} from '@/lib/try-on';
+import {sounds} from '@/lib/audio';
 
 const initial: ViewState = {
   ready: false,
@@ -34,10 +34,10 @@ const initial: ViewState = {
   placed: false,
   busy: false,
   error: '',
-  trackingMode: 'card',
-  cardTracked: false,
   size: 1,
   rotationY: 0,
+  drifting: false,
+  speed: 0,
 };
 
 const defaultDrop = '2026-09-11T18:00';
@@ -47,7 +47,6 @@ export default function Page() {
   const engine = useRef<TryOn | null>(null);
   const [state, setState] = useState(initial);
   const [permission, setPermission] = useState(false);
-  const [cardModal, setCardModal] = useState(false);
   const [quickLook, setQuickLook] = useState(false);
   const [drop, setDrop] = useState(defaultDrop);
   const [now, setNow] = useState(0);
@@ -116,6 +115,17 @@ export default function Page() {
     onLostPointerCapture: () => engine.current?.stop(),
   });
 
+  const holdDrift = {
+    onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      engine.current?.setDrift(true);
+    },
+    onPointerUp: () => engine.current?.setDrift(false),
+    onPointerCancel: () => engine.current?.setDrift(false),
+    onLostPointerCapture: () => engine.current?.setDrift(false),
+  };
+
   const save = () => {
     setSaved(!saved);
     try {
@@ -127,7 +137,7 @@ export default function Page() {
   // Touch handlers for rotation and pinch zoom on the 3D visual area
   const onTouchStart = (e: React.TouchEvent<HTMLElement>) => {
     if (state.mode === 'product') return;
-    if ((e.target as HTMLElement).closest('button, .dpad, .size-buttons, .utility, .tracking-toggle')) return;
+    if ((e.target as HTMLElement).closest('button, .dpad, .size-buttons, .utility')) return;
 
     if (e.touches.length === 1) {
       touchData.current = {
@@ -150,7 +160,7 @@ export default function Page() {
 
   const onTouchMove = (e: React.TouchEvent<HTMLElement>) => {
     if (state.mode === 'product') return;
-    if ((e.target as HTMLElement).closest('button, .dpad, .size-buttons, .utility, .tracking-toggle')) return;
+    if ((e.target as HTMLElement).closest('button, .dpad, .size-buttons, .utility')) return;
 
     if (touchData.current.mode === 'rotate' && e.touches.length === 1) {
       const dx = e.touches[0].clientX - touchData.current.x;
@@ -176,7 +186,7 @@ export default function Page() {
   // Mouse drag to rotate and wheel to zoom on desktop
   const onMouseDown = (e: React.MouseEvent<HTMLElement>) => {
     if (state.mode === 'product') return;
-    if ((e.target as HTMLElement).closest('button, .dpad, .size-buttons, .utility, .tracking-toggle')) return;
+    if ((e.target as HTMLElement).closest('button, .dpad, .size-buttons, .utility')) return;
     isMouseDown.current = true;
     lastMouseX.current = e.clientX;
   };
@@ -197,13 +207,6 @@ export default function Page() {
     engine.current?.scale(-e.deltaY * 0.001);
   };
 
-  const handlePrintCard = () => {
-    const printWin = window.open('/tracking-card.svg', '_blank');
-    if (printWin) {
-      printWin.focus();
-    }
-  };
-
   return (
     <main
       className={`app ${state.mode !== 'product' ? 'trying' : ''} ${state.mode === 'camera' ? 'camera-mode' : ''}`}
@@ -217,9 +220,15 @@ export default function Page() {
     >
       {state.mode === 'product' && (
         <header className="brandbar">
-          <div className="brand">
+          <button
+            type="button"
+            className="brand brand-btn"
+            onClick={() => sounds.playZeptoSound()}
+            title="Play Zepto Turbo Sound"
+          >
             zepto<span>CONCEPT</span>
-          </div>
+            <Volume2 size={16} className="sound-badge" />
+          </button>
           <div className="delivery">
             <MapPin size={17} />
             <span>
@@ -244,22 +253,19 @@ export default function Page() {
             <strong>Ballistik in your space</strong>
             <span>
               {state.mode === 'camera'
-                ? state.trackingMode === 'card'
-                  ? 'Table-locked AR · Tracking card'
-                  : 'Manual overlay mode'
+                ? 'Real-world gyro-anchored AR'
                 : 'Interactive 3D demo'}
             </span>
           </div>
-          {state.mode === 'camera' && (
-            <button
-              className="card-shortcut-btn"
-              onClick={() => setCardModal(true)}
-              title="Show or print tracking card"
-            >
-              <FileText size={15} />
-              <span>Card</span>
-            </button>
-          )}
+          <button
+            type="button"
+            className="zepto-sound-chip"
+            onClick={() => sounds.playZeptoSound()}
+            title="Play Zepto Sound"
+          >
+            <Volume2 size={14} />
+            <span>Sound</span>
+          </button>
           <span className="small-3d">3D</span>
         </header>
       )}
@@ -312,8 +318,8 @@ export default function Page() {
                 <Scan size={27} />
               </span>
               <span>
-                <strong>Try it on your table</strong>
-                <small>Table-locked AR with card tracking · Drive & explore.</small>
+                <strong>Try it on your table & floor</strong>
+                <small>Real-world gyro anchoring · Endless driving & drift.</small>
               </span>
               <ArrowRight size={21} />
             </button>
@@ -357,20 +363,27 @@ export default function Page() {
               <h3>Meet your next shelf favourite.</h3>
               <p>
                 Explore the Ballistik’s sculpted body, detailed wheels and bold finish in 3D. Bring it into your
-                surroundings with table-locked card tracking, pinch to zoom, drag to spin, and drive across your table.
+                surroundings with real-world gyro anchoring, pinch to zoom, drag to spin, endless driving, and powerslide drift.
               </p>
               <div className="feature-row">
                 <Target size={20} />
                 <span>
-                  <b>Table-Locked Card AR</b>
-                  <small>Car stays locked to your physical table using a printable card.</small>
+                  <b>Real-World Gyro Anchoring</b>
+                  <small>Car stays locked in 3D space when you tilt and move your camera.</small>
+                </span>
+              </div>
+              <div className="feature-row">
+                <Flame size={20} />
+                <span>
+                  <b>Endless Driving & Drift</b>
+                  <small>No wall boundaries. Hold DRIFT to kick out the tail with tire screech!</small>
                 </span>
               </div>
               <div className="feature-row">
                 <Sparkles size={20} />
                 <span>
-                  <b>Touch Gestures Anywhere</b>
-                  <small>Pinch to zoom and drag to rotate the car directly on screen.</small>
+                  <b>Interactive Audio & Gestures</b>
+                  <small>Pinch to zoom, drag to rotate, and tap the Zepto logo for turbo sounds.</small>
                 </span>
               </div>
               <div className="feature-row">
@@ -418,78 +431,27 @@ export default function Page() {
       {state.mode !== 'product' && (
         <>
           <div className="placement-copy">
-            {state.mode === 'camera' && (
-              <div className="tracking-toggle">
-                <button
-                  className={state.trackingMode === 'card' ? 'active' : ''}
-                  onClick={() => engine.current?.setTrackingMode('card')}
-                >
-                  <Target size={14} /> Card AR (Locked)
-                </button>
-                <button
-                  className={state.trackingMode === 'manual' ? 'active' : ''}
-                  onClick={() => engine.current?.setTrackingMode('manual')}
-                >
-                  <Box size={14} /> Free Overlay
-                </button>
-              </div>
-            )}
-
-            {state.mode === 'camera' && state.trackingMode === 'card' ? (
-              <div className={`tracking-hud-pill ${state.cardTracked ? 'tracked' : 'searching'}`}>
-                {state.cardTracked ? (
-                  <>
-                    <Check size={14} />
-                    <span>TABLE LOCKED · ON CARD</span>
-                  </>
-                ) : (
-                  <>
-                    <Scan size={14} className="spin-slow" />
-                    <span>AIM CAMERA AT TRACKING CARD</span>
-                    <button
-                      className="pill-action-btn"
-                      onClick={() => setCardModal(true)}
-                    >
-                      Show Card
-                    </button>
-                  </>
-                )}
-              </div>
-            ) : (
-              <span className="status-pill">
-                <span />
-                {state.placed ? 'READY TO ROLL' : 'MAKE ROOM FOR A LITTLE LEGEND'}
-              </span>
-            )}
+            <span className="status-pill">
+              <span />
+              {state.placed ? 'REAL-WORLD ANCHORED · READY TO ROLL' : 'ALIGN CAR WITH YOUR SPACE'}
+            </span>
 
             <h2>
-              {state.mode === 'camera' && state.trackingMode === 'card'
-                ? state.cardTracked
-                  ? 'Card locked. Ready to drive!'
-                  : 'Point at tracking card'
-                : state.placed
-                ? 'Your table. Your test drive.'
-                : 'Aim at your table.'}
+              {state.placed
+                ? 'Your surface. Your test drive.'
+                : 'Aim at your table or floor.'}
             </h2>
             <p>
-              {state.mode === 'camera' && state.trackingMode === 'card'
-                ? state.cardTracked
-                  ? 'Phone moves freely—the car stays locked to your table! Drag to spin · pinch to resize.'
-                  : 'Place the printable card flat on your table. When detected, the car anchors directly to it.'
-                : state.mode === 'camera'
-                ? 'Manual overlay mode. Pinch to zoom, drag to rotate, or switch to Card AR above.'
-                : 'Pinch to zoom, drag to spin, and hold an arrow to drive around.'}
+              {state.placed
+                ? 'Locked in 3D space. Moving or tilting camera keeps car grounded. Hold arrows to drive endlessly · hold DRIFT to powerslide!'
+                : 'Point camera at table or floor, pinch to scale, drag to spin, then tap start driving.'}
             </p>
           </div>
 
           {!state.placed ? (
             <div className="place-controls">
               <div className="reticle-text">
-                {state.mode === 'camera' && state.trackingMode === 'card'
-                  ? state.cardTracked
-                    ? 'CARD DETECTED · TAP TO START DRIVING'
-                    : 'AIM CAMERA AT THE PRINTED / DISPLAYED CARD'
-                  : 'ALIGN CAR WITH YOUR SURFACE'}
+                SURFACE DETECTED · TAP TO LOCK & DRIVE
               </div>
               <button className="pink-button" onClick={() => engine.current?.place()}>
                 Start driving here <Scan size={19} />
@@ -498,9 +460,18 @@ export default function Page() {
           ) : (
             <section className="drive-controls">
               <div className="utility">
-                <button onClick={() => engine.current?.reset()}>
+                <button onClick={() => engine.current?.reset()} title="Reset car position">
                   <RotateCcw size={18} />
                   <span>Reset</span>
+                </button>
+                <button
+                  type="button"
+                  className={`drift-btn ${state.drifting ? 'active' : ''}`}
+                  aria-label="Hold to drift"
+                  {...holdDrift}
+                >
+                  <Flame size={18} />
+                  <span>DRIFT</span>
                 </button>
                 <div className="size-buttons">
                   <button aria-label="Make car smaller" onClick={() => engine.current?.scale(-0.15)}>
@@ -519,7 +490,15 @@ export default function Page() {
                 <button className="left" aria-label="Move left" {...hold(-1, 0)}>
                   <ArrowLeft />
                 </button>
-                <span className="pad-center">z</span>
+                <button
+                  type="button"
+                  className="pad-center pad-center-btn"
+                  onClick={() => sounds.playZeptoSound()}
+                  aria-label="Zepto Turbo Sound"
+                  title="Zepto Turbo Sound"
+                >
+                  z
+                </button>
                 <button className="right" aria-label="Move right" {...hold(1, 0)}>
                   <ArrowRight />
                 </button>
@@ -527,7 +506,7 @@ export default function Page() {
                   <ArrowDown />
                 </button>
               </div>
-              <p>HOLD ARROW TO DRIVE · PINCH TO ZOOM · DRAG TO SPIN</p>
+              <p>HOLD ARROW TO DRIVE · HOLD DRIFT TO POWERSLIDE · PINCH/DRAG CAR</p>
             </section>
           )}
 
@@ -545,26 +524,16 @@ export default function Page() {
           <div className="permission-icon">
             <Camera size={31} />
           </div>
-          <DialogTitle className="permission-title">Your table is the showroom.</DialogTitle>
+          <DialogTitle className="permission-title">Your room is the racetrack.</DialogTitle>
           <DialogDescription className="permission-description">
-            Experience real table-locked AR with card tracking, or try free overlay and 3D preview.
+            Experience real-world gyro-anchored AR, or try the 3D preview mode.
           </DialogDescription>
 
           <div className="camera-explainer">
-            <b>🎯 Real Table-Locked AR (Recommended)</b>
+            <b>🎯 Real-World Gyro Anchoring</b>
             <p>
-              Place the tracking card flat on your table. The camera locks the car to the card in 6-DOF, so when you move
-              your phone up or tilt it, the car stays solidly on your table!
+              Locks the car to your floor or table in physical space. When you tilt your phone camera up or move around, the car stays grounded right where you placed it!
             </p>
-            <button
-              className="card-preview-link"
-              onClick={() => {
-                setPermission(false);
-                setCardModal(true);
-              }}
-            >
-              <FileText size={14} /> View or print tracking card ↗
-            </button>
           </div>
 
           {state.error && (
@@ -601,53 +570,6 @@ export default function Page() {
             </a>
           )}
           <small className="privacy-note">Camera footage is processed locally and stays on your device.</small>
-        </DialogContent>
-      </Dialog>
-
-      {/* Tracking Card Modal */}
-      <Dialog open={cardModal} onOpenChange={setCardModal}>
-        <DialogContent className="card-modal-dialog">
-          <div className="card-modal-header">
-            <Target size={24} className="card-icon" />
-            <div>
-              <DialogTitle className="card-modal-title">AR Surface Tracking Card</DialogTitle>
-              <DialogDescription className="card-modal-desc">
-                Print this card or display it flat on a tablet, laptop, or another phone screen.
-              </DialogDescription>
-            </div>
-          </div>
-
-          <div className="card-image-wrap">
-            <img src="/tracking-card.svg" alt="Zepto x Hot Wheels AR Tracking Card" className="card-svg-preview" />
-          </div>
-
-          <div className="card-instructions">
-            <div className="instruction-step">
-              <span>1</span>
-              <p>Place this card flat on your table or desk.</p>
-            </div>
-            <div className="instruction-step">
-              <span>2</span>
-              <p>Aim your camera at the card. The car locks directly on top!</p>
-            </div>
-            <div className="instruction-step">
-              <span>3</span>
-              <p>Pinch to resize, drag to spin, and hold arrows to drive on the table.</p>
-            </div>
-          </div>
-
-          <div className="card-modal-actions">
-            <button className="outline-button" onClick={handlePrintCard}>
-              <Printer size={16} /> Print Card
-            </button>
-            <a href="/tracking-card.svg" target="_blank" rel="noreferrer" className="outline-button download-link">
-              <Download size={16} /> Download SVG
-            </a>
-          </div>
-
-          <button className="pink-button" onClick={() => setCardModal(false)}>
-            Got it, ready to play!
-          </button>
         </DialogContent>
       </Dialog>
     </main>

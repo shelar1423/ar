@@ -8,35 +8,45 @@
 @media(max-width:700px){.app{max-width:480px}.brandbar{padding:15px 20px}.brand{font-size:33px}.brand span{font-size:8px}.delivery{font-size:10px;gap:5px}.delivery svg{width:14px}.breadcrumb{padding:16px 20px;font-size:10px}.product-layout{display:block;padding:0}.visual{position:relative;top:auto;height:315px;border-radius:0;background:radial-gradient(ellipse at 50% 40%,#fff,#f1e7f9)}.edition-tag{top:10px;left:22px;right:22px;font-size:9px}.edition-tag span{font-size:20px}.model-stamp{bottom:49px;font-size:34px;letter-spacing:5px}.viewer-caption{bottom:15px;font-size:10px}.product-details{padding:23px 22px 35px}h1{font-size:31px;margin:15px 0 17px}.product-name h2{font-size:18px}.product-name>span{font-size:12px}.price{margin:16px 0 19px}.price strong{font-size:24px}.try-button{padding:14px}.try-button strong{font-size:15px}.drop-card{margin-top:20px;padding:20px}.trying{max-width:none}.trying .visual{position:absolute;height:100%}.placement-copy h2{font-size:23px}}
 @media(max-height:650px){.placement-copy{top:85px}.placement-copy h2{font-size:19px;margin:6px 0}.placement-copy p{font-size:10px}.dpad{grid-template-columns:44px 44px 44px;grid-template-rows:44px 44px 44px}.drive-controls{bottom:12px}.utility{bottom:50px}.try-header{padding-top:12px}.permission-dialog{max-height:94dvh;overflow-y:auto}}
 
-/* Card AR & Gesture Controls */
-.card-shortcut-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:#f0e4fb;border:1px solid #d4b8ee;border-radius:20px;color:#7329aa;font-size:11px;font-weight:750}
-.card-shortcut-btn:active{background:#e2ccf7}
-.card-preview-link{background:none;border:none;color:#f32978;font-size:12px;font-weight:750;display:inline-flex;align-items:center;gap:5px;padding:4px 0;margin-top:6px;cursor:pointer}
-.card-preview-link:hover{text-decoration:underline}
-.tracking-toggle{display:inline-flex;background:#ffffffd4;backdrop-filter:blur(8px);border:1px solid #dcc4f1;border-radius:30px;padding:3px;margin:0 auto 10px;pointer-events:auto}
-.tracking-toggle button{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:750;color:#6f458a;background:transparent;transition:all .15s}
-.tracking-toggle button.active{background:#f32978;color:white;box-shadow:0 2px 6px #f3297844}
-.tracking-hud-pill{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:30px;font-size:10px;font-weight:800;letter-spacing:1px;pointer-events:auto;margin:0 auto 8px;backdrop-filter:blur(10px)}
-.tracking-hud-pill.tracked{background:#ecfdf5d9;border:1px solid #6ee7b7;color:#065f46}
-.tracking-hud-pill.searching{background:#fffbebfa;border:1px solid #fcd34d;color:#92400e;animation:hud-pulse 2s infinite ease-in-out}
-.pill-action-btn{margin-left:4px;background:#f59e0b;color:white;padding:3px 8px;border-radius:12px;font-size:9px;font-weight:750}
-.pill-action-btn:active{background:#d97706}
-@keyframes hud-pulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(245,158,11,0)}50%{transform:scale(1.02);box-shadow:0 0 0 4px rgba(245,158,11,.25)}}
-.spin-slow{animation:spin 3s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
+/* Zepto Audio & Drift Racing Controls */
+.brand-btn{background:none;padding:0;cursor:pointer;transition:transform .15s ease}
+.brand-btn:hover{transform:scale(1.02)}
+.brand-btn:active{transform:scale(0.96)}
+.sound-badge{color:#e9b4ff;opacity:0.8;margin-left:-4px}
+.zepto-sound-chip{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:#fae8ff;border:1px solid #e9bbfb;border-radius:20px;color:#9319c7;font-size:11px;font-weight:800;cursor:pointer;transition:all .15s}
+.zepto-sound-chip:active{background:#f3ccfc;transform:scale(.95)}
+.pad-center-btn{border:none;cursor:pointer;transition:all .15s;font-family:inherit}
+.pad-center-btn:hover{background:#fff;transform:scale(1.05)}
+.pad-center-btn:active{background:#ff287c;color:white;transform:scale(.92);box-shadow:0 0 12px #ff287caa}
 
-/* Tracking Card Modal */
-.card-modal-dialog{max-width:440px!important;border-radius:24px!important;padding:24px!important;background:white}
-.card-modal-header{display:flex;gap:12px;align-items:flex-start}
-.card-icon{color:#e02424;margin-top:2px;flex-shrink:0}
-.card-modal-title{font-size:19px!important;font-weight:800!important;letter-spacing:-.4px;color:#18181b}
-.card-modal-desc{font-size:12px!important;color:#71717a;line-height:1.4;margin-top:3px}
-.card-image-wrap{background:#fafafa;border:1px solid #e4e4e7;border-radius:16px;padding:14px;display:flex;justify-content:center;margin:8px 0}
-.card-svg-preview{max-width:240px;width:100%;height:auto;aspect-ratio:1;box-shadow:0 6px 18px rgba(0,0,0,.08);border-radius:12px}
-.card-instructions{display:grid;gap:8px;margin:4px 0 10px}
-.instruction-step{display:flex;align-items:center;gap:10px;font-size:12px;color:#3f3f46}
-.instruction-step span{width:20px;height:20px;border-radius:50%;background:#f4f4f5;border:1px solid #d4d4d8;font-size:11px;font-weight:800;display:grid;place-items:center;color:#18181b;flex-shrink:0}
-.instruction-step p{margin:0;line-height:1.4}
-.card-modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.card-modal-actions .download-link{text-decoration:none}
-@media print{body *{visibility:hidden}.card-image-wrap,.card-image-wrap *{visibility:visible}.card-image-wrap{position:fixed;inset:0;padding:0;margin:0;border:none;background:white;display:flex;align-items:center;justify-content:center}.card-svg-preview{max-width:160mm!important;box-shadow:none}}
+.drift-btn{
+  pointer-events:auto;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  padding:8px 16px;
+  min-width:76px;
+  border-radius:14px;
+  background:linear-gradient(135deg,#ff4500 0%,#f32978 100%);
+  color:white;
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:1.5px;
+  box-shadow:0 4px 12px rgba(243,41,120,.4),0 2px 4px rgba(255,69,0,.3);
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+  transition:transform .1s,box-shadow .1s;
+}
+.drift-btn:hover{
+  box-shadow:0 6px 18px rgba(243,41,120,.6),0 2px 8px rgba(255,69,0,.5);
+  transform:translateY(-1px);
+}
+.drift-btn:active,.drift-btn.active{
+  background:linear-gradient(135deg,#ff1a00 0%,#c40049 100%);
+  box-shadow:0 0 20px rgba(255,69,0,.85),inset 0 2px 4px rgba(0,0,0,.25);
+  transform:scale(0.95);
+}
+
