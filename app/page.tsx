@@ -53,7 +53,10 @@ export default function Page() {
   const [saved, setSaved] = useState(false);
   const [note, setNote] = useState('');
 
-  // Gesture state (pinch-to-scale and drag-to-rotate)
+  // Active driving directions state for smooth multi-touch
+  const activeDirs = useRef({up: false, down: false, left: false, right: false});
+
+  // Gesture state (pinch-to-scale and drag-to-rotate on 3D canvas)
   const touchData = useRef<{
     x: number;
     y: number;
@@ -100,30 +103,68 @@ export default function Page() {
   ];
 
   const back = () => {
+    activeDirs.current = {up: false, down: false, left: false, right: false};
     engine.current?.product();
     setNote('');
   };
 
-  const hold = (x: number, z: number) => ({
-    onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
-      e.preventDefault();
-      e.currentTarget.setPointerCapture(e.pointerId);
+  const updateDirection = () => {
+    let x = 0, z = 0;
+    if (activeDirs.current.left) x -= 1;
+    if (activeDirs.current.right) x += 1;
+    if (activeDirs.current.up) z -= 1;
+    if (activeDirs.current.down) z += 1;
+
+    if (x === 0 && z === 0) {
+      engine.current?.stop();
+    } else {
       engine.current?.move(x, z);
+    }
+  };
+
+  const dirHold = (dir: 'up' | 'down' | 'left' | 'right') => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      e.preventDefault();
+      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+      activeDirs.current[dir] = true;
+      updateDirection();
     },
-    onPointerUp: () => engine.current?.stop(),
-    onPointerCancel: () => engine.current?.stop(),
-    onLostPointerCapture: () => engine.current?.stop(),
+    onPointerUp: (e: React.PointerEvent) => {
+      e.preventDefault();
+      activeDirs.current[dir] = false;
+      updateDirection();
+    },
+    onPointerCancel: () => {
+      activeDirs.current[dir] = false;
+      updateDirection();
+    },
+    onLostPointerCapture: () => {
+      activeDirs.current[dir] = false;
+      updateDirection();
+    },
   });
 
   const holdDrift = {
-    onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+    onPointerDown: (e: React.PointerEvent) => {
       e.preventDefault();
-      e.currentTarget.setPointerCapture(e.pointerId);
+      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
       engine.current?.setDrift(true);
     },
-    onPointerUp: () => engine.current?.setDrift(false),
-    onPointerCancel: () => engine.current?.setDrift(false),
-    onLostPointerCapture: () => engine.current?.setDrift(false),
+    onPointerUp: (e: React.PointerEvent) => {
+      e.preventDefault();
+      engine.current?.setDrift(false);
+    },
+    onPointerCancel: () => {
+      engine.current?.setDrift(false);
+    },
+    onLostPointerCapture: () => {
+      engine.current?.setDrift(false);
+    },
+  };
+
+  const onHorn = (e: React.PointerEvent | React.MouseEvent) => {
+    e.preventDefault();
+    sounds.playHorn();
   };
 
   const save = () => {
@@ -134,10 +175,10 @@ export default function Page() {
     setNote(!saved ? 'Saved on this device. This demo does not send notifications.' : 'Removed from your saved drops.');
   };
 
-  // Touch handlers for rotation and pinch zoom on the 3D visual area
+  // Touch handlers for rotation and pinch zoom on the 3D visual canvas (skips controls)
   const onTouchStart = (e: React.TouchEvent<HTMLElement>) => {
     if (state.mode === 'product') return;
-    if ((e.target as HTMLElement).closest('button, .dpad, .size-buttons, .utility')) return;
+    if ((e.target as HTMLElement).closest('button, .dpad-cluster, .action-cluster, .top-actions, .gamepad-hud, .place-controls')) return;
 
     if (e.touches.length === 1) {
       touchData.current = {
@@ -160,7 +201,7 @@ export default function Page() {
 
   const onTouchMove = (e: React.TouchEvent<HTMLElement>) => {
     if (state.mode === 'product') return;
-    if ((e.target as HTMLElement).closest('button, .dpad, .size-buttons, .utility')) return;
+    if ((e.target as HTMLElement).closest('button, .dpad-cluster, .action-cluster, .top-actions, .gamepad-hud, .place-controls')) return;
 
     if (touchData.current.mode === 'rotate' && e.touches.length === 1) {
       const dx = e.touches[0].clientX - touchData.current.x;
@@ -183,10 +224,9 @@ export default function Page() {
     touchData.current = {x: 0, y: 0, distance: 0, mode: 'none'};
   };
 
-  // Mouse drag to rotate and wheel to zoom on desktop
   const onMouseDown = (e: React.MouseEvent<HTMLElement>) => {
     if (state.mode === 'product') return;
-    if ((e.target as HTMLElement).closest('button, .dpad, .size-buttons, .utility')) return;
+    if ((e.target as HTMLElement).closest('button, .dpad-cluster, .action-cluster, .top-actions, .gamepad-hud, .place-controls')) return;
     isMouseDown.current = true;
     lastMouseX.current = e.clientX;
   };
@@ -223,8 +263,8 @@ export default function Page() {
           <button
             type="button"
             className="brand brand-btn"
-            onClick={() => sounds.playZeptoSound()}
-            title="Play Zepto Turbo Sound"
+            onClick={onHorn}
+            title="Play Zepto Turbo Horn"
           >
             zepto<span>CONCEPT</span>
             <Volume2 size={16} className="sound-badge" />
@@ -246,27 +286,46 @@ export default function Page() {
         </div>
       ) : (
         <header className="try-header">
-          <button aria-label="Back to product" onClick={back}>
-            <ArrowLeft />
+          <button aria-label="Back to product" onClick={back} className="back-btn">
+            <ArrowLeft size={18} />
           </button>
-          <div>
-            <strong>Ballistik in your space</strong>
-            <span>
-              {state.mode === 'camera'
-                ? 'Real-world gyro-anchored AR'
-                : 'Interactive 3D demo'}
-            </span>
+
+          <div className="try-title-block">
+            <strong>Ballistik</strong>
+            <span>{state.mode === 'camera' ? 'Real-world AR' : '3D Demo'}</span>
           </div>
-          <button
-            type="button"
-            className="zepto-sound-chip"
-            onClick={() => sounds.playZeptoSound()}
-            title="Play Zepto Sound"
-          >
-            <Volume2 size={14} />
-            <span>Sound</span>
-          </button>
-          <span className="small-3d">3D</span>
+
+          {state.placed ? (
+            <div className="top-actions">
+              <button
+                className="top-btn"
+                onClick={() => engine.current?.reset()}
+                title="Reset car position"
+                aria-label="Reset position"
+              >
+                <RotateCcw size={14} />
+                <span>Reset</span>
+              </button>
+
+              <div className="top-size-pill">
+                <button
+                  aria-label="Make car smaller"
+                  onClick={() => engine.current?.scale(-0.15)}
+                >
+                  <Minus size={14} />
+                </button>
+                <span>Size</span>
+                <button
+                  aria-label="Make car larger"
+                  onClick={() => engine.current?.scale(0.15)}
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span className="small-3d">3D</span>
+          )}
         </header>
       )}
 
@@ -376,14 +435,14 @@ export default function Page() {
                 <Flame size={20} />
                 <span>
                   <b>Endless Driving & Drift</b>
-                  <small>No wall boundaries. Hold DRIFT to kick out the tail with tire screech!</small>
+                  <small>No boundaries. Hold DRIFT to kick out the tail with tire screech!</small>
                 </span>
               </div>
               <div className="feature-row">
                 <Sparkles size={20} />
                 <span>
                   <b>Interactive Audio & Gestures</b>
-                  <small>Pinch to zoom, drag to rotate, and tap the Zepto logo for turbo sounds.</small>
+                  <small>Pinch to zoom, drag to rotate, and tap HORN for turbocharged sounds.</small>
                 </span>
               </div>
               <div className="feature-row">
@@ -430,84 +489,64 @@ export default function Page() {
 
       {state.mode !== 'product' && (
         <>
-          <div className="placement-copy">
-            <span className="status-pill">
-              <span />
-              {state.placed ? 'REAL-WORLD ANCHORED · READY TO ROLL' : 'ALIGN CAR WITH YOUR SPACE'}
-            </span>
-
-            <h2>
-              {state.placed
-                ? 'Your surface. Your test drive.'
-                : 'Aim at your table or floor.'}
-            </h2>
-            <p>
-              {state.placed
-                ? 'Locked in 3D space. Moving or tilting camera keeps car grounded. Hold arrows to drive endlessly · hold DRIFT to powerslide!'
-                : 'Point camera at table or floor, pinch to scale, drag to spin, then tap start driving.'}
-            </p>
-          </div>
-
           {!state.placed ? (
             <div className="place-controls">
               <div className="reticle-text">
-                SURFACE DETECTED · TAP TO LOCK & DRIVE
+                AIM AT TABLE OR FLOOR & TAP TO LOCK CAR
               </div>
               <button className="pink-button" onClick={() => engine.current?.place()}>
                 Start driving here <Scan size={19} />
               </button>
             </div>
           ) : (
-            <section className="drive-controls">
-              <div className="utility">
-                <button onClick={() => engine.current?.reset()} title="Reset car position">
-                  <RotateCcw size={18} />
-                  <span>Reset</span>
+            <div className="gamepad-hud">
+              {/* Left Thumb: Directional D-Pad */}
+              <div className="dpad-cluster">
+                <button className="dpad-btn up" aria-label="Drive forward" {...dirHold('up')}>
+                  <ArrowUp size={22} />
                 </button>
+                <button className="dpad-btn left" aria-label="Turn left" {...dirHold('left')}>
+                  <ArrowLeft size={22} />
+                </button>
+                <div
+                  className="dpad-hub"
+                  onPointerDown={onHorn}
+                  title="Horn"
+                  aria-label="Horn"
+                >
+                  <Volume2 size={16} />
+                </div>
+                <button className="dpad-btn right" aria-label="Turn right" {...dirHold('right')}>
+                  <ArrowRight size={22} />
+                </button>
+                <button className="dpad-btn down" aria-label="Reverse" {...dirHold('down')}>
+                  <ArrowDown size={22} />
+                </button>
+              </div>
+
+              {/* Right Thumb: Action Controls (DRIFT & HORN) */}
+              <div className="action-cluster">
                 <button
                   type="button"
-                  className={`drift-btn ${state.drifting ? 'active' : ''}`}
+                  className={`drift-action-btn ${state.drifting ? 'active' : ''}`}
                   aria-label="Hold to drift"
                   {...holdDrift}
                 >
-                  <Flame size={18} />
+                  <Flame size={24} />
                   <span>DRIFT</span>
                 </button>
-                <div className="size-buttons">
-                  <button aria-label="Make car smaller" onClick={() => engine.current?.scale(-0.15)}>
-                    <Minus size={18} />
-                  </button>
-                  <span>Size</span>
-                  <button aria-label="Make car larger" onClick={() => engine.current?.scale(0.15)}>
-                    <Plus size={18} />
-                  </button>
-                </div>
-              </div>
-              <div className="dpad">
-                <button className="up" aria-label="Move forward" {...hold(0, -1)}>
-                  <ArrowUp />
-                </button>
-                <button className="left" aria-label="Move left" {...hold(-1, 0)}>
-                  <ArrowLeft />
-                </button>
+
                 <button
                   type="button"
-                  className="pad-center pad-center-btn"
-                  onClick={() => sounds.playZeptoSound()}
-                  aria-label="Zepto Turbo Sound"
-                  title="Zepto Turbo Sound"
+                  className="horn-action-btn"
+                  aria-label="Car horn"
+                  onPointerDown={onHorn}
                 >
-                  z
-                </button>
-                <button className="right" aria-label="Move right" {...hold(1, 0)}>
-                  <ArrowRight />
-                </button>
-                <button className="down" aria-label="Move backward" {...hold(0, 1)}>
-                  <ArrowDown />
+                  <Volume2 size={24} />
+                  <span>HORN</span>
                 </button>
               </div>
-              <p>HOLD ARROW TO DRIVE · HOLD DRIFT TO POWERSLIDE · PINCH/DRAG CAR</p>
-            </section>
+            </div>
           )}
 
           {state.error && (

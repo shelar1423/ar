@@ -51,6 +51,8 @@ export class TryOn {
   size = 1;
   angle = 0;
   isDrifting = false;
+  driftAngle = 0;
+  lastSkidTime = 0;
   velocity = new T.Vector3();
   carSpeed = 0;
 
@@ -356,23 +358,40 @@ export class TryOn {
 
   private addSkidMark() {
     if (this.dead || typeof document === 'undefined') return;
-    // Add realistic tire skid strip on the ground plane behind the rear tires
-    const markGeo = new T.PlaneGeometry(0.18 * this.size, 0.08 * this.size);
+    const now = performance.now();
+    if (now - this.lastSkidTime < 60) return;
+    this.lastSkidTime = now;
+
+    // Realistic dark rubber skid mark on the ground
+    const markGeo = new T.PlaneGeometry(0.14 * this.size, 0.24 * this.size);
     const markMat = new T.MeshBasicMaterial({
-      color: 0x111111,
+      color: 0x141414,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.45,
       depthWrite: false,
     });
     const mark = new T.Mesh(markGeo, markMat);
     mark.rotation.x = -Math.PI / 2;
     mark.rotation.z = -this.car.rotation.y;
-    mark.position.copy(this.car.position);
-    mark.position.y = 0.001;
+
+    // Position behind the rear tires
+    const backDist = -0.32 * this.size;
+    mark.position.set(
+      this.car.position.x + Math.sin(this.car.rotation.y) * backDist,
+      0.002,
+      this.car.position.z + Math.cos(this.car.rotation.y) * backDist
+    );
 
     this.skidMarksGroup.add(mark);
 
-    // Fade out and remove old skid marks
+    // Keep pool limited to 40 skid marks
+    if (this.skidMarksGroup.children.length > 40) {
+      const oldest = this.skidMarksGroup.children[0] as T.Mesh;
+      this.skidMarksGroup.remove(oldest);
+      oldest.geometry.dispose();
+      (oldest.material as T.Material).dispose();
+    }
+
     setTimeout(() => {
       if (mark.parent) {
         mark.parent.remove(mark);
@@ -429,12 +448,12 @@ export class TryOn {
 
         if (isMoving) {
           const length = Math.hypot(x, z);
-          const moveSpeed = this.isDrifting ? 1.15 : 0.75;
+          const moveSpeed = this.isDrifting ? 1.25 : 0.75;
           const targetVx = (x / length) * moveSpeed;
           const targetVz = (z / length) * moveSpeed;
 
-          // Drift physics: inertia & powerslide slip
-          const slipRate = this.isDrifting ? 4 : 14;
+          // Drift physics: lower traction, higher lateral slip
+          const slipRate = this.isDrifting ? 3.5 : 14;
           this.velocity.x += (targetVx - this.velocity.x) * dt * slipRate;
           this.velocity.z += (targetVz - this.velocity.z) * dt * slipRate;
 
@@ -449,23 +468,38 @@ export class TryOn {
           this.angle = Math.atan2(this.velocity.x, this.velocity.z);
           const current = this.car.rotation.y;
           const delta = Math.atan2(Math.sin(this.angle - current), Math.cos(this.angle - current));
-          const turnRate = this.isDrifting ? 20 : 12;
+          const turnRate = this.isDrifting ? 24 : 12;
           this.car.rotation.y += delta * Math.min(1, dt * turnRate);
 
-          // Rear-end drift angle styling (powerslide body tilt)
+          // Rear-end drift angle styling (powerslide body tilt & skid marks)
           if (this.isDrifting) {
-            this.carModel.rotation.y = -delta * 0.45;
+            const targetSlide = x !== 0 ? (x > 0 ? -0.65 : 0.65) : Math.sin(Date.now() * 0.008) * 0.45;
+            this.driftAngle = T.MathUtils.lerp(this.driftAngle, targetSlide, dt * 10);
+            this.carModel.rotation.y = this.driftAngle;
+            this.carModel.rotation.z = Math.sin(Date.now() * 0.02) * 0.04;
             this.addSkidMark();
           } else {
-            this.carModel.rotation.y = 0;
+            this.driftAngle = T.MathUtils.lerp(this.driftAngle, 0, dt * 10);
+            this.carModel.rotation.y = this.driftAngle;
+            this.carModel.rotation.z = 0;
           }
+        } else if (this.isDrifting) {
+          // Stationary Donut Burnout Spin!
+          this.angle += dt * 4.5;
+          this.car.rotation.y = this.angle;
+          this.carModel.rotation.y = 0.45;
+          this.carModel.rotation.z = 0.04;
+          this.carSpeed = 0.8;
+          this.addSkidMark();
         } else {
           // Coasting decelerate
           this.velocity.multiplyScalar(Math.max(0, 1 - dt * 6));
           this.carSpeed = this.velocity.length();
           this.car.position.x += this.velocity.x * dt;
           this.car.position.z += this.velocity.z * dt;
-          this.carModel.rotation.y *= Math.max(0, 1 - dt * 8);
+          this.driftAngle = T.MathUtils.lerp(this.driftAngle, 0, dt * 10);
+          this.carModel.rotation.y = this.driftAngle;
+          this.carModel.rotation.z = 0;
         }
 
         // Shadow follows the car across the endless ground

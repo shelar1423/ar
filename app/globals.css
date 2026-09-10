@@ -8,45 +8,173 @@
 @media(max-width:700px){.app{max-width:480px}.brandbar{padding:15px 20px}.brand{font-size:33px}.brand span{font-size:8px}.delivery{font-size:10px;gap:5px}.delivery svg{width:14px}.breadcrumb{padding:16px 20px;font-size:10px}.product-layout{display:block;padding:0}.visual{position:relative;top:auto;height:315px;border-radius:0;background:radial-gradient(ellipse at 50% 40%,#fff,#f1e7f9)}.edition-tag{top:10px;left:22px;right:22px;font-size:9px}.edition-tag span{font-size:20px}.model-stamp{bottom:49px;font-size:34px;letter-spacing:5px}.viewer-caption{bottom:15px;font-size:10px}.product-details{padding:23px 22px 35px}h1{font-size:31px;margin:15px 0 17px}.product-name h2{font-size:18px}.product-name>span{font-size:12px}.price{margin:16px 0 19px}.price strong{font-size:24px}.try-button{padding:14px}.try-button strong{font-size:15px}.drop-card{margin-top:20px;padding:20px}.trying{max-width:none}.trying .visual{position:absolute;height:100%}.placement-copy h2{font-size:23px}}
 @media(max-height:650px){.placement-copy{top:85px}.placement-copy h2{font-size:19px;margin:6px 0}.placement-copy p{font-size:10px}.dpad{grid-template-columns:44px 44px 44px;grid-template-rows:44px 44px 44px}.drive-controls{bottom:12px}.utility{bottom:50px}.try-header{padding-top:12px}.permission-dialog{max-height:94dvh;overflow-y:auto}}
 
-/* Zepto Audio & Drift Racing Controls */
-.brand-btn{background:none;padding:0;cursor:pointer;transition:transform .15s ease}
-.brand-btn:hover{transform:scale(1.02)}
-.brand-btn:active{transform:scale(0.96)}
-.sound-badge{color:#e9b4ff;opacity:0.8;margin-left:-4px}
-.zepto-sound-chip{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:#fae8ff;border:1px solid #e9bbfb;border-radius:20px;color:#9319c7;font-size:11px;font-weight:800;cursor:pointer;transition:all .15s}
-.zepto-sound-chip:active{background:#f3ccfc;transform:scale(.95)}
-.pad-center-btn{border:none;cursor:pointer;transition:all .15s;font-family:inherit}
-.pad-center-btn:hover{background:#fff;transform:scale(1.05)}
-.pad-center-btn:active{background:#ff287c;color:white;transform:scale(.92);box-shadow:0 0 12px #ff287caa}
+/* Header & Top Action Utilities */
+.try-header{position:absolute;left:0;right:0;top:0;z-index:10;padding:calc(env(safe-area-inset-top) + 14px) 16px 12px;display:flex;align-items:center;gap:10px;background:#ffffffd9;backdrop-filter:blur(15px);border-bottom:1px solid #ffffff44}
+.back-btn{width:36px;height:36px;background:#f3e9fa;border-radius:50%;display:grid;place-items:center;color:#6b338f;cursor:pointer;flex-shrink:0}
+.back-btn:active{background:#e7d5f5}
+.try-title-block{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0}
+.try-title-block strong{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.try-title-block span{font-size:10px;color:#8c769a;white-space:nowrap}
+.top-actions{display:flex;align-items:center;gap:8px;margin-left:auto;pointer-events:auto;flex-shrink:0}
+.top-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;background:#ffffffeb;border:1px solid #dcc6f0;border-radius:20px;font-size:11px;font-weight:750;color:#6b289c;box-shadow:0 2px 6px rgba(0,0,0,.06);cursor:pointer;transition:all .12s}
+.top-btn:active{background:#f3e4ff;transform:scale(.95)}
+.top-size-pill{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;background:#ffffffeb;border:1px solid #dcc6f0;border-radius:20px;font-size:11px;font-weight:750;color:#6b289c;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+.top-size-pill button{width:26px;height:26px;display:grid;place-items:center;background:none;border:none;border-radius:50%;color:#6b289c;cursor:pointer}
+.top-size-pill button:active{background:#eed8fd}
+.small-3d{font-size:11px;font-weight:800;border:1px solid #d6c0e5;border-radius:6px;padding:5px 8px;color:#784490}
 
-.drift-btn{
+/* Placing Controls */
+.place-controls{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 36px);left:20px;right:20px;max-width:380px;margin:auto;text-align:center;z-index:10}
+.reticle-text{font-size:10px;font-weight:800;letter-spacing:1.5px;margin-bottom:12px;color:#6b239c;background:#ffffffdb;backdrop-filter:blur(8px);padding:7px 16px;border-radius:20px;display:inline-block;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.place-controls button{width:100%}
+
+/* Two-Thumb Gamepad HUD (No Overlapping!) */
+.gamepad-hud{
+  position:absolute;
+  bottom:calc(env(safe-area-inset-bottom) + 20px);
+  left:16px;
+  right:16px;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  pointer-events:none;
+  z-index:10;
+}
+
+/* Left Thumb D-Pad */
+.dpad-cluster{
   pointer-events:auto;
+  display:grid;
+  grid-template-columns:48px 48px 48px;
+  grid-template-rows:48px 48px 48px;
+  gap:5px;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.dpad-btn{
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+  border-radius:14px;
+  background:#521382e0;
+  backdrop-filter:blur(10px);
+  color:white;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(255,255,255,.28);
+  box-shadow:0 4px 10px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.2);
+  cursor:pointer;
+  transition:transform .08s,background .08s;
+}
+.dpad-btn:active{
+  background:#f32978;
+  box-shadow:0 0 16px #f32978aa;
+  transform:scale(.92);
+}
+.dpad-btn.up{grid-column:2;grid-row:1}
+.dpad-btn.left{grid-column:1;grid-row:2}
+.dpad-btn.right{grid-column:3;grid-row:2}
+.dpad-btn.down{grid-column:2;grid-row:3}
+.dpad-hub{
+  grid-column:2;
+  grid-row:2;
+  border-radius:50%;
+  background:rgba(255,255,255,.18);
+  display:grid;
+  place-items:center;
+  color:#ff2a7c;
+  cursor:pointer;
+  border:1px solid rgba(255,255,255,.2);
+  transition:all .12s;
+}
+.dpad-hub:active{
+  background:#ff2a7c;
+  color:white;
+  transform:scale(.9);
+}
+
+/* Right Thumb Action Cluster (DRIFT & HORN) */
+.action-cluster{
+  pointer-events:auto;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  align-items:center;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+.drift-action-btn{
+  width:72px;
+  height:72px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#ff4500 0%,#f32978 100%);
+  color:white;
   display:flex;
   flex-direction:column;
   align-items:center;
   justify-content:center;
   gap:2px;
-  padding:8px 16px;
-  min-width:76px;
-  border-radius:14px;
-  background:linear-gradient(135deg,#ff4500 0%,#f32978 100%);
-  color:white;
   font-size:11px;
   font-weight:900;
   letter-spacing:1.5px;
-  box-shadow:0 4px 12px rgba(243,41,120,.4),0 2px 4px rgba(255,69,0,.3);
+  border:3px solid rgba(255,255,255,.3);
+  box-shadow:0 6px 18px rgba(255,69,0,.5),inset 0 2px 4px rgba(255,255,255,.4);
   touch-action:none;
   user-select:none;
   -webkit-user-select:none;
   transition:transform .1s,box-shadow .1s;
+  cursor:pointer;
 }
-.drift-btn:hover{
-  box-shadow:0 6px 18px rgba(243,41,120,.6),0 2px 8px rgba(255,69,0,.5);
-  transform:translateY(-1px);
+.drift-action-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 24px rgba(255,69,0,.7);
 }
-.drift-btn:active,.drift-btn.active{
-  background:linear-gradient(135deg,#ff1a00 0%,#c40049 100%);
-  box-shadow:0 0 20px rgba(255,69,0,.85),inset 0 2px 4px rgba(0,0,0,.25);
-  transform:scale(0.95);
+.drift-action-btn:active,.drift-action-btn.active{
+  background:linear-gradient(135deg,#ff1100 0%,#c40049 100%);
+  transform:scale(.92);
+  box-shadow:0 0 28px rgba(255,69,0,.95),0 0 0 4px #ff4500;
+  border-color:#fff;
 }
+
+.horn-action-btn{
+  width:72px;
+  height:72px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#7c22b9 0%,#e91e63 100%);
+  color:white;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:1.5px;
+  border:3px solid rgba(255,255,255,.3);
+  box-shadow:0 6px 18px rgba(124,34,185,.45),inset 0 2px 4px rgba(255,255,255,.4);
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+  transition:transform .1s,box-shadow .1s;
+  cursor:pointer;
+}
+.horn-action-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 24px rgba(124,34,185,.65);
+}
+.horn-action-btn:active{
+  background:linear-gradient(135deg,#f32978 0%,#ff5294 100%);
+  transform:scale(.92);
+  box-shadow:0 0 24px #f32978,0 0 0 4px #ff5294;
+  border-color:#fff;
+}
+
+/* Brand Audio trigger */
+.brand-btn{background:none;padding:0;cursor:pointer;transition:transform .15s ease}
+.brand-btn:hover{transform:scale(1.02)}
+.brand-btn:active{transform:scale(0.96)}
+.sound-badge{color:#e9b4ff;opacity:0.8;margin-left:-4px}
 
