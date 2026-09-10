@@ -1,4 +1,16 @@
-# Pocket Track AR
+# Hot Wheels Drop — Zepto Concept
+
+## Current demo (supersedes the legacy gameplay notes below)
+
+The main page is now a Zepto-style product and scheduled-drop campaign. Orbit the large upright Ballistik model, edit the sample drop time (IST), and save the drop locally. Prices and campaign details are illustrative; no checkout or notifications are implemented.
+
+Try it on your table requests the rear camera, then lets you place and drive the car with four hold-to-move arrows. Release to stop; reset and size controls keep it visible. On iPhone this is a manually aligned, screen-fixed camera overlay, not surface-tracked AR. Hold the phone still. A camera-free preview is available. The separate iPhone AR link uses a pre-generated USDZ in Apple Quick Look for real-world placement without web driving controls. No native app is required.
+
+`scripts/prepare-model.mjs` bakes the original skeletal pose into upright static GLB and USDZ assets. Run `node scripts/verify-demo.mjs` for current headless model and controller tests. Type-check with `npx tsc --noEmit`; build with `npm run build`. Camera permission, Quick Look appearance and performance still need physical iPhone testing.
+
+Sites publishes `dist/client`. `vercel.json` prepares a future Vercel deployment but does not connect GitHub or Vercel. This is an independent Zepto/Hot Wheels concept, not an official app.
+
+## Legacy prototype notes
 
 Ballistik toy racing prototype, created separately from plan-main. Uses the supplied real GLB, not a replacement model. No API key, Unity, Blender or MCP needed to play.
 

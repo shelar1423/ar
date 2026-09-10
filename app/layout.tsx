@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Pocket Track AR — Ballistik',
-  description: 'A playable 3D toy racing game with surface-placed AR on supported phones.',
+  title: 'Hot Wheels Drop — Zepto Concept',
+  description: 'Explore Ballistik in 3D, try the camera controller demo, and preview a scheduled collector drop.',
 };
 
 export default function RootLayout({

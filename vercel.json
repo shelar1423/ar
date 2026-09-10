@@ -1,0 +1,6 @@
+{
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/client",
+  "headers": [{ "source": "/models/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }] }, { "source": "/models/ballistik.usdz", "headers": [{ "key": "Content-Type", "value": "model/vnd.usdz+zip" }] }]
+}
