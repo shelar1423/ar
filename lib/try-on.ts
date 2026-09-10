@@ -37,7 +37,7 @@ export class TryOn {
   carModel = new T.Group();
   renderer: T.WebGLRenderer;
   orbit: OrbitControls;
-  shadow = new T.Mesh(new T.PlaneGeometry(6, 6), new T.ShadowMaterial({opacity: 0.3}));
+  shadow = new T.Mesh(new T.PlaneGeometry(10, 10), new T.ShadowMaterial({opacity: 0.55}));
   skidMarksGroup = new T.Group();
   env: T.WebGLRenderTarget;
   observer: ResizeObserver;
@@ -48,7 +48,7 @@ export class TryOn {
   request = 0;
   last = 0;
   direction = {x: 0, z: 0};
-  size = 1;
+  size = 1.35;
   angle = 0;
   isDrifting = false;
   driftAngle = 0;
@@ -56,7 +56,7 @@ export class TryOn {
   velocity = new T.Vector3();
   carSpeed = 0;
 
-  // Real world gyroscope / orientation tracking
+  // Real world gyroscope / orientation tracking with stabilization filters
   deviceBeta = 0;
   deviceGamma = 0;
   deviceAlpha = 0;
@@ -64,29 +64,39 @@ export class TryOn {
   basePitch = 0;
   baseYaw = 0;
   baseRoll = 0;
-  baseCameraPos = new T.Vector3(0, 2.7, 3.1);
+  smoothedPitch = 0;
+  smoothedRoll = 0;
+  targetPitch = 0;
+  targetRoll = 0;
+  baseCameraPos = new T.Vector3(0, 2.3, 2.5);
 
   constructor(private host:HTMLElement,private emit:(s:ViewState)=>void){
     this.renderer = new T.WebGLRenderer({alpha: true, antialias: true});
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.8));
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2.0));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = T.PCFShadowMap;
     this.renderer.toneMapping = T.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.3;
+    this.renderer.toneMappingExposure = 1.45;
     this.renderer.domElement.className = 'car-canvas';
     host.appendChild(this.renderer.domElement);
 
-    this.scene.add(new T.HemisphereLight(0xffffff, 0x8d92ab, 2.4));
-    const light = new T.DirectionalLight(0xffffff, 4);
-    light.position.set(3, 5, 3);
-    light.castShadow = true;
-    light.shadow.mapSize.set(1024, 1024);
-    light.shadow.normalBias = 0.015;
-    light.shadow.camera.left = -10;
-    light.shadow.camera.right = 10;
-    light.shadow.camera.top = 10;
-    light.shadow.camera.bottom = -10;
-    this.scene.add(light);
+    // Multi-angle studio lighting so model is bright and clearly visible in any room
+    this.scene.add(new T.HemisphereLight(0xffffff, 0x9ca3af, 2.8));
+
+    const keyLight = new T.DirectionalLight(0xffffff, 3.8);
+    keyLight.position.set(3, 5, 3);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(1024, 1024);
+    keyLight.shadow.normalBias = 0.015;
+    this.scene.add(keyLight);
+
+    const fillLight = new T.DirectionalLight(0xfff5ea, 2.8);
+    fillLight.position.set(-3, 4, -2);
+    this.scene.add(fillLight);
+
+    const frontLight = new T.DirectionalLight(0xffffff, 2.2);
+    frontLight.position.set(0, 3, 5);
+    this.scene.add(frontLight);
 
     const pm = new T.PMREMGenerator(this.renderer), room = new RoomEnvironment();
     this.env = pm.fromScene(room, 0.04);
@@ -303,6 +313,10 @@ export class TryOn {
       this.baseYaw = 0;
       this.baseRoll = 0;
     }
+    this.targetPitch = 0;
+    this.targetRoll = 0;
+    this.smoothedPitch = 0;
+    this.smoothedRoll = 0;
     this.baseCameraPos.copy(this.camera.position);
 
     this.publish();
@@ -325,8 +339,9 @@ export class TryOn {
   }
 
   scale(delta: number) {
-    this.size = T.MathUtils.clamp(this.size + delta, 0.65, 1.6);
+    this.size = T.MathUtils.clamp(this.size + delta, 0.65, 4.0);
     this.car.scale.setScalar(this.size);
+    this.shadow.scale.setScalar(this.size);
     this.confine();
     this.publish();
   }
@@ -349,9 +364,6 @@ export class TryOn {
   }
 
   confine() {
-    // Endless driving: no small bounding box constraint!
-    // The car can travel freely across the ground plane.
-    // However, if size changes, we ensure valid numbers.
     if (!Number.isFinite(this.car.position.x)) this.car.position.x = 0;
     if (!Number.isFinite(this.car.position.z)) this.car.position.z = 0;
   }
@@ -409,8 +421,8 @@ export class TryOn {
     this.camera.fov = this.state.mode === 'product' ? 36 : 45;
 
     if (this.state.mode !== 'product') {
-      const distance = this.camera.aspect < 0.75 ? 5.2 : 4;
-      this.camera.position.set(0, distance * 0.65, distance * 0.75);
+      const distance = this.camera.aspect < 0.75 ? 3.4 : 3.0;
+      this.camera.position.set(0, distance * 0.68, distance * 0.75);
       this.camera.lookAt(0, 0, 0);
       this.baseCameraPos.copy(this.camera.position);
     }
@@ -424,20 +436,30 @@ export class TryOn {
     if (this.state.mode === 'product') {
       this.orbit?.update();
     } else {
-      // Real-world gyroscope compensation:
-      // When the user moves/tilts their phone UP, deltaPitch > 0.
-      // The 3D camera tilts up to follow the phone, so the car stays locked on the table/floor!
+      // Rock-solid gyroscope compensation with low-pass filtering and deadbanding
       if (this.state.mode === 'camera' && this.state.placed && this.hasOrientation) {
         const degToRad = Math.PI / 180;
-        const deltaPitch = (this.deviceBeta - this.basePitch) * degToRad;
-        const deltaYaw = (this.deviceAlpha - this.baseYaw) * degToRad;
-        const deltaRoll = (this.deviceGamma - this.baseRoll) * degToRad;
+        const rawDeltaPitch = (this.deviceBeta - this.basePitch) * degToRad;
+        const rawDeltaRoll = (this.deviceGamma - this.baseRoll) * degToRad;
+
+        // Deadband filter: ignore micro-tremors below 0.35 deg
+        if (Math.abs(rawDeltaPitch - this.targetPitch) > 0.006) {
+          this.targetPitch = rawDeltaPitch;
+        }
+        if (Math.abs(rawDeltaRoll - this.targetRoll) > 0.01) {
+          this.targetRoll = rawDeltaRoll;
+        }
+
+        // Exponential smoothing (low-pass filter) to eliminate all shaking
+        const smoothSpeed = Math.min(1.0, dt * 6.0);
+        this.smoothedPitch += (this.targetPitch - this.smoothedPitch) * smoothSpeed;
+        this.smoothedRoll += (this.targetRoll - this.smoothedRoll) * (smoothSpeed * 0.4);
 
         const baseRotX = -Math.atan2(this.baseCameraPos.y, this.baseCameraPos.z);
         this.camera.rotation.set(
-          baseRotX + deltaPitch,
-          -deltaYaw,
-          -deltaRoll,
+          baseRotX + this.smoothedPitch,
+          0, // Zero compass jitter!
+          -this.smoothedRoll * 0.3, // Calm roll damping
           'YXZ'
         );
       }

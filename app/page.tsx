@@ -310,14 +310,14 @@ export default function Page() {
               <div className="top-size-pill">
                 <button
                   aria-label="Make car smaller"
-                  onClick={() => engine.current?.scale(-0.15)}
+                  onClick={() => engine.current?.scale(-0.35)}
                 >
                   <Minus size={14} />
                 </button>
                 <span>Size</span>
                 <button
                   aria-label="Make car larger"
-                  onClick={() => engine.current?.scale(0.15)}
+                  onClick={() => engine.current?.scale(0.35)}
                 >
                   <Plus size={14} />
                 </button>
