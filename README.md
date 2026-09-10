@@ -12,6 +12,12 @@ Drag the car to orbit in the garage. Choose Race in 3D. Hold GO to accelerate, u
 
 Play in your space checks immersive WebXR support. On compatible phones and browsers, it requests camera-backed AR, surface hit tests and DOM overlay for touch controls. Scan a well-lit surface and press Place racetrack. The track is about 1.3 metres wide. Unsupported devices can play in 3D. HTTPS is required for phone AR; a plain local-network HTTP address is insufficient. iPhone users should use 3D if their browser does not expose immersive-ar. No camera imagery is uploaded by game code.
 
+## iPhone modes
+
+In Safari, View car in iPhone AR converts the supplied car to USDZ on device. After preparation, tap Place car in AR to open Apple's native viewer. This places the car in your surroundings but does not run the browser race inside Quick Look.
+
+Camera race requests the rear camera and runs the game over its live feed. The track stays fixed on screen; it is not world-anchored AR. Hold the phone still while racing. Camera streams stop when you return to the garage or leave the page. Race in 3D does not request camera access.
+
 ## Model attribution
 
 Hot Wheels - Unleashed 2: Ballistik by Zorg_Sinister, supplied by the user.

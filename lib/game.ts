@@ -3,11 +3,12 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-export type GameState={ready:boolean;progress:number;mode:'garage'|'race';phase:'idle'|'running'|'paused'|'won'|'lost'|'error';speed:number;lap:number;time:number;coins:number;energy:number;message:string;ar:boolean;placed:boolean;supported:boolean};
+export type GameState={ready:boolean;progress:number;mode:'garage'|'race';phase:'idle'|'running'|'paused'|'won'|'lost'|'error';speed:number;lap:number;time:number;coins:number;energy:number;message:string;ar:boolean;placed:boolean;supported:boolean;cameraMode?:boolean;quickLook?:boolean;quickLookUrl?:string;exportBusy?:boolean};
 type Item={mesh:T.Mesh;t:number;lane:number;hit:boolean;kind:'coin'|'barrier'};
 const TAU=Math.PI*2;
 export class Game{
  toolLifecycle=new AbortController();
+ video:HTMLVideoElement|null=null; stream:MediaStream|null=null; cameraRequest=0;
  state:GameState={ready:false,progress:0,mode:'garage',phase:'idle',speed:0,lap:1,time:60,coins:0,energy:100,message:'',ar:false,placed:false,supported:false};
  scene=new T.Scene(); camera=new T.PerspectiveCamera(38,1,.01,120); renderer:T.WebGLRenderer; orbit:OrbitControls;
  showroom=new T.Group(); world=new T.Group(); car=new T.Group(); floor:T.Mesh; reticle:T.Mesh;
@@ -23,7 +24,7 @@ export class Game{
   this.orbit=new OrbitControls(this.camera,this.renderer.domElement);this.orbit.enableDamping=true;this.orbit.enablePan=false;this.orbit.maxPolarAngle=Math.PI*.48;this.orbit.minDistance=3;this.orbit.maxDistance=15;this.orbit.autoRotate=true;this.orbit.autoRotateSpeed=.6;
   this.buildTrack();this.showGarage();this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(host);this.resize();
   window.addEventListener('keydown',this.keyDown);window.addEventListener('keyup',this.keyUp);window.addEventListener('blur',this.blur);document.addEventListener('visibilitychange',this.visibility);
-  overlay.addEventListener('beforexrselect',this.beforeSelect);this.registerTools();
+  overlay.addEventListener('beforexrselect',this.beforeSelect);this.registerTools();this.state.quickLook=document.createElement('a').relList.supports('ar');
   this.renderer.setAnimationLoop(this.frame);this.load();navigator.xr?.isSessionSupported('immersive-ar').then(ok=>{this.state.supported=ok;this.publish()}).catch(()=>{});
  }
  publish(){if(!this.dead)this.emit({...this.state})}
@@ -37,18 +38,21 @@ export class Game{
   for(let row=0;row<2;row++)for(let col=0;col<8;col++){const m=new T.Mesh(new T.BoxGeometry(.17,.013,.16),new T.MeshBasicMaterial({color:(row+col)%2?0x18282d:0xffffff}));m.position.copy(this.point(.003+row*.006,(col-3.5)*.17));this.world.add(m)}
   for(let i=1;i<=18;i++){const t=i/20;const lane=(i%3-1)*.43;const mesh=new T.Mesh(new T.TorusGeometry(.14,.035,8,16),new T.MeshStandardMaterial({color:0xffe460,metalness:.7,roughness:.25,emissive:0xf7b000,emissiveIntensity:.3}));mesh.position.copy(this.point(t,lane)).y+=.28;this.world.add(mesh);this.items.push({mesh,t,lane,hit:false,kind:'coin'})}
   for(let i=0;i<8;i++){const t=.11+i*.105;const lane=((i*2)%3-1)*.43;const mesh=new T.Mesh(new T.BoxGeometry(.31,.27,.23),new T.MeshStandardMaterial({color:0x293c46,roughness:.6}));mesh.position.copy(this.point(t,lane)).y+=.135;mesh.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),this.tangent(t));this.world.add(mesh);this.items.push({mesh,t,lane,hit:false,kind:'barrier'})}
-  const base=new T.Mesh(new T.CylinderGeometry(6.3,6.5,.16,100),new T.MeshStandardMaterial({color:0x192d34,roughness:.95}));base.position.y=-.1;base.scale.z=.72;base.receiveShadow=true;this.world.add(base);
-  const grid=new T.GridHelper(20,40,0x294751,0x20363e);grid.position.y=-.2;this.world.add(grid);
+  const base=new T.Mesh(new T.CylinderGeometry(6.3,6.5,.16,100),new T.MeshStandardMaterial({color:0x192d34,roughness:.95}));base.position.y=-.1;base.scale.z=.72;base.receiveShadow=true;base.userData.backdrop=true;this.world.add(base);
+  const grid=new T.GridHelper(20,40,0x294751,0x20363e);grid.position.y=-.2;grid.userData.backdrop=true;this.world.add(grid);
  }
  showGarage(){this.state.mode='garage';this.state.phase='idle';this.state.ar=false;this.state.placed=false;this.state.message='';this.world.visible=false;this.world.scale.setScalar(1);this.world.position.set(0,0,0);this.world.quaternion.identity();this.showroom.visible=true;this.showroom.add(this.car);this.car.scale.setScalar(3.1);this.car.position.set(0,.025,0);this.car.quaternion.identity();this.scene.background=new T.Color(0xe8e9e6);this.orbit.enabled=true;this.orbit.autoRotate=true;this.orbit.target.set(0,.2,0);this.camera.position.set(5,3.4,6);this.resize();this.publish()}
- async garage(){this.release();if(this.xrSession){await this.xrSession.end();return}this.showGarage()}
- start(){if(!this.state.ready||this.xrBusy)return;this.release();this.distance=0;this.targetLane=0;this.lanePosition=0;this.state={...this.state,mode:'race',phase:'running',time:60,lap:1,speed:0,coins:0,energy:100,message:'Hold GO. Steer around barriers. Collect gold rings.'};this.messageUntil=0;this.showroom.visible=false;this.world.visible=true;this.world.add(this.car);this.car.scale.setScalar(.7);this.resetItems();this.orbit.enabled=false;if(!this.state.ar){this.world.scale.setScalar(1);this.world.position.set(0,0,0);this.scene.background=new T.Color(0x101e25)}this.publish()}
+ async garage(){this.release();this.stopCamera();if(this.xrSession){await this.xrSession.end();return}this.showGarage()}
+ start(){if(!this.state.ready||this.xrBusy)return;this.release();this.distance=0;this.targetLane=0;this.lanePosition=0;this.state={...this.state,mode:'race',phase:'running',time:60,lap:1,speed:0,coins:0,energy:100,message:'Hold GO. Steer around barriers. Collect gold rings.'};this.messageUntil=0;this.showroom.visible=false;this.world.visible=true;this.world.add(this.car);this.car.scale.setScalar(.7);this.resetItems();this.orbit.enabled=false;if(!this.state.ar){this.world.scale.setScalar(1);this.world.position.set(0,0,0);this.scene.background=this.state.cameraMode?null:new T.Color(0x101e25)}this.world.children.forEach(o=>{if(o.userData.backdrop)o.visible=!this.state.cameraMode});this.publish()}
  resetItems(){this.items.forEach(i=>{i.hit=false;i.mesh.visible=true})}
  input(key:'gas'|'brake'|'boost',value:boolean){this.keys[key]=value}
  lane(direction:number){if(this.state.phase==='running')this.targetLane=T.MathUtils.clamp(this.targetLane+direction,-1,1)}
  release(){this.keys={gas:false,brake:false,boost:false}}
  pause(){if(!['running','paused'].includes(this.state.phase))return;this.state.phase=this.state.phase==='paused'?'running':'paused';this.release();this.publish()}
  dismiss(){this.state.message='';this.publish()}
+ async prepareQuickLook(){if(!this.state.ready||this.state.exportBusy)return;this.state.exportBusy=true;this.state.message='Preparing your actual Ballistik for iPhone AR…';this.publish();try{const {USDZExporter}=await import('three/addons/exporters/USDZExporter.js');const object=this.car.clone(true);object.position.set(0,0,0);object.quaternion.identity();object.scale.setScalar(.075);object.updateMatrixWorld(true);const bytes=await new USDZExporter().parseAsync(object,{quickLookCompatible:true,maxTextureSize:1024});if(this.dead)return;if(this.state.quickLookUrl)URL.revokeObjectURL(this.state.quickLookUrl);this.state.quickLookUrl=URL.createObjectURL(new Blob([bytes as BlobPart],{type:'model/vnd.usdz+zip'}));this.state.message='Ready! Tap “Place car in AR”, then choose AR in the iPhone viewer. This is a car viewer; return here to race.';}catch{this.state.message='The iPhone AR model couldn’t be prepared. You can still use Camera race or Race in 3D.';}finally{this.state.exportBusy=false;this.publish()}}
+ async enterCamera(){if(!this.state.ready)return;const ticket=++this.cameraRequest;this.state.message='Allow camera access to race over your live camera view.';this.publish();try{if(!navigator.mediaDevices?.getUserMedia)throw new Error('Camera unavailable');const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});if(this.dead||ticket!==this.cameraRequest){stream.getTracks().forEach(t=>t.stop());return}this.stream=stream;const video=document.createElement('video');video.muted=true;video.autoplay=true;video.playsInline=true;video.className='camera-feed';video.srcObject=stream;this.video=video;this.host.appendChild(video);await video.play();if(this.dead||ticket!==this.cameraRequest)return;this.state.cameraMode=true;this.start()}catch{this.stopCamera();this.state.message='Camera access wasn’t available. Allow it in Safari settings, or tap Race in 3D.';this.publish()}}
+ stopCamera(){this.cameraRequest++;this.stream?.getTracks().forEach(t=>t.stop());this.stream=null;if(this.video){this.video.pause();this.video.srcObject=null;this.video.remove();this.video=null}this.state.cameraMode=false}
  registerTools(){
   type Tool={name:string;description:string;inputSchema:object;annotations:{readOnlyHint:boolean};execute:(input:unknown)=>unknown};
   const context=(document as Document & {modelContext?:{registerTool:(tool:Tool,options:{signal:AbortSignal})=>void|Promise<void>}}).modelContext;
@@ -74,7 +78,7 @@ export class Game{
    }
    const t=this.distance%1;this.car.position.copy(this.point(t,this.lanePosition));this.car.position.y+=.025;this.car.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),this.tangent(t));
    this.items.forEach(i=>{if(i.kind==='coin')i.mesh.rotation.y=ms*.002});
-   if(!s.ar){const p=this.car.position,dir=this.tangent(t);const portrait=this.camera.aspect<1;const desired=p.clone().addScaledVector(dir,-(portrait?4.5:3.8)).add(new T.Vector3(0,portrait?4.7:3.2,0));this.camera.position.lerp(desired,1-Math.exp(-dt*4));this.camera.lookAt(p.clone().addScaledVector(dir,1.7));}
+   if(s.cameraMode){this.camera.fov=65;this.camera.updateProjectionMatrix();this.camera.position.set(6,15,15);this.camera.lookAt(0,0,0)}else if(!s.ar){this.camera.fov=48;this.camera.updateProjectionMatrix();const p=this.car.position,dir=this.tangent(t);const portrait=this.camera.aspect<1;const desired=p.clone().addScaledVector(dir,-(portrait?4.5:3.8)).add(new T.Vector3(0,portrait?4.7:3.2,0));this.camera.position.lerp(desired,1-Math.exp(-dt*4));this.camera.lookAt(p.clone().addScaledVector(dir,1.7));}
   }
   this.renderer.render(this.scene,this.camera);if(ms-this.uiTime>90){this.uiTime=ms;this.publish()}
  };
@@ -84,5 +88,5 @@ export class Game{
  }
  place(){if(!this.state.ar||this.state.placed)return;if(!this.reticle.visible){this.state.message='No surface yet. Move slowly over a textured, well-lit table or floor.';this.publish();return}this.world.position.setFromMatrixPosition(this.reticle.matrix);this.world.quaternion.setFromRotationMatrix(this.reticle.matrix);this.world.scale.setScalar(.1);this.state.placed=true;this.reticle.visible=false;this.start()}
  disposeObject(root:T.Object3D){const textures=new Set<T.Texture>();root.traverse(o=>{if(o instanceof T.Mesh){o.geometry.dispose();for(const m of(Array.isArray(o.material)?o.material:[o.material])){Object.values(m).forEach(v=>{if(v instanceof T.Texture)textures.add(v)});m.dispose()}}});textures.forEach(t=>t.dispose())}
- dispose(){this.dead=true;this.toolLifecycle.abort();this.renderer.setAnimationLoop(null);this.xrSession?.end().catch(()=>{});this.hitSource?.cancel();this.resizeObserver.disconnect();this.orbit.dispose();window.removeEventListener('keydown',this.keyDown);window.removeEventListener('keyup',this.keyUp);window.removeEventListener('blur',this.blur);document.removeEventListener('visibilitychange',this.visibility);this.overlay.removeEventListener('beforexrselect',this.beforeSelect);this.disposeObject(this.scene);this.env.dispose();this.renderer.dispose();this.renderer.domElement.remove()}
+ dispose(){this.dead=true;this.stopCamera();if(this.state.quickLookUrl)URL.revokeObjectURL(this.state.quickLookUrl);this.toolLifecycle.abort();this.renderer.setAnimationLoop(null);this.xrSession?.end().catch(()=>{});this.hitSource?.cancel();this.resizeObserver.disconnect();this.orbit.dispose();window.removeEventListener('keydown',this.keyDown);window.removeEventListener('keyup',this.keyUp);window.removeEventListener('blur',this.blur);document.removeEventListener('visibilitychange',this.visibility);this.overlay.removeEventListener('beforexrselect',this.beforeSelect);this.disposeObject(this.scene);this.env.dispose();this.renderer.dispose();this.renderer.domElement.remove()}
 }
